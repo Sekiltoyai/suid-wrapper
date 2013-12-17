@@ -1,0 +1,65 @@
+#!/bin/bash
+#
+# Copyright (c) 2013, Emmanuel Thierry <emmanuel.thierry@sekil.fr>
+# All rights reserved.
+#
+# See LICENCE for more information
+#
+
+SUID_DEFAULTS=/usr/share/suid-wrapper/defaults.h
+SUID_WRAPPER=/usr/share/suid-wrapper/wrapper.c
+SUID_DIR=/var/lib/suid-wrapper
+SUID_CONF=/etc/suid-wrapper
+
+[ -f /etc/default/suid-wrappers ] && /etc/default/suid-wrappers
+
+
+get_conf() {
+	local file=$1
+	local value=$2
+	local default=$3
+	local line
+
+	line=$( cat $file | grep -P "^${value}=" )
+	if [ ! -z "${line}" ]
+	then
+		echo -n "${line}" | sed "s/${value}=//"
+		return
+	fi
+
+	echo -n $default
+}
+
+build_one() {
+	local wrapper=$1
+	gcc -o ${SUID_DIR}/$wrapper -lcap \
+	                            -include ${SUID_CONF}/$wrapper.conf \
+	                            -include ${SUID_DEFAULTS} \
+	                            ${SUID_WRAPPER}
+	if ! (( $? ))
+	then
+		local wrapper_uid=$( get_conf "${SUID_CONF}/$wrapper.conf" "WRAPPER_UID" root )
+		local wrapper_gid=$( get_conf "${SUID_CONF}/$wrapper.conf" "WRAPPER_GID" root )
+		local wrapper_path=$( get_conf "${SUID_CONF}/$wrapper.conf" "WRAPPER_PATH" "${SUID_DIR}/$wrapper" )
+		local wrapper_perms=$( get_conf "${SUID_CONF}/$wrapper.conf" "WRAPPER_PERMS" "4750" )
+
+		if [ "${wrapper_path}" != "${SUID_DIR}/$wrapper" ]
+		then
+			mv "${SUID_DIR}/$wrapper" "${wrapper_path}"     || return 1
+		fi
+
+		chown "${wrapper_uid}:${wrapper_gid}" "${wrapper_path}" || return 1
+		chmod "${wrapper_perms}" "${wrapper_path}"              || return 1
+
+		echo "Built ${wrapper}.conf in ${wrapper_path}"
+		echo -e "\towned by ${wrapper_uid}:${wrapper_gid} perms ${wrapper_perms}"
+	else
+		echo "Failed to build ${wrapper}.conf"
+	fi
+}
+
+for wrapper in $( ls ${SUID_CONF} | grep "^.*\.conf$" )
+do
+	wrapper=$( basename $wrapper ".conf" )
+	build_one ${wrapper}
+done
