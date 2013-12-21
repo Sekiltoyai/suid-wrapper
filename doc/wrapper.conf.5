@@ -1,0 +1,143 @@
+.TH wrapper.conf 5 2013-12-18 "Suid-wrapper 0.9"
+.SH NAME
+wrapper.conf - Configuration files for build-wrapper
+
+.SH DESCRIPTION
+Suid-wrapper provides the possibility to easily build customized setuid wrappers. These wrappers
+are built by the build-wrappers tool from configuration files written in CPP. Each wrapper is built
+using GCC from information included in its configuration file.
+.P
+Wrapper configuration files combines two types of directives:
+.IP \(bu 4
+C macros read by GCC to fill in parameters in the template file
+.IP \(bu 4
+Comments read by build-wrappers to package the wrapper after its compilation
+
+.SH WRAPPER MACROS
+Wrapper variables are defined using the "#define" CPP instruction. They control three kinds of
+settings:
+.IP \(bu 4
+Checks performed by the wrapper on the caller and on program parameters (macros
+.BR CHK_* )
+.IP \(bu 4
+Permissions to which the executed program will be restricted (macros
+.BR DO_* )
+.IP \(bu 4
+Information to execute the program such as path or arguments (macros
+.BR EXEC_* )
+.P
+Valid macros are:
+.TP
+.B #define CHK_ARGC_MIN <min>
+Define the minimum numbers of arguments that may be passed to the wrapper, including the wrapper
+name. These arguments will be added to the program arguments after those specified in the
+.B EXEC_ARGS
+macro. If given, must be included between 1 and 65535.
+.TP
+.B #define CHK_ARGC_MAX <max>
+Define the maximum numbers of arguments that may be passed to the wrapper, including the wrapper
+name. These arguments will be added to the program arguments after those specified in the
+.B EXEC_ARGS
+macro. If given, must be included between 1 and 65535.
+.TP
+.B #define CHK_ARGS_REGEXP ["<arg1>",[ "<arg2>",[ ... ]]]
+Check each wrapper argument against regular expressions. Regexps are separated by commas, each
+regexp checks the corresponding argument, excluding the wrapper name. See
+.BR regex (7)
+for more information about regular expressions.
+.TP
+.B #define CHK_ARGS_REGEXP_FLAGS <flags>
+Apply matching flags to all regular expressions. This permits for example to perform
+case-insensitive matchings.
+.TP
+.B #define CHK_REAL_UID <uid>
+Check the real UID of the caller before executing the program. If given, must be included between
+1 and 65535.
+.TP
+.B #define CHK_REAL_GID <gid>
+Check the real GID of the caller before executing the program. If given, must be included between
+1 and 65535.
+.TP
+.B #define DO_SETUID <uid>
+Set the real UID of the process before calling the program. If given, must be included between
+1 and 65535. This option may cause undefined behavior when used with the
+.B DO_CAPABILITIES
+macro.
+.TP
+.B #define DO_SETGID <uid>
+Set the real GID of the process before calling the program. If given, must be included between
+1 and 65535. This option may cause undefined behavior when used with the
+.B DO_CAPABILITIES
+macro.
+.TP
+.B #define DO_CAPABILITIES [<cap1> [, <cap2> [, ...]]]
+Set capabilities to the given set. Capabilities are separated by commas. This option may cause undefined behavior when used with the
+.B DO_SETUID
+or
+.B DO_SETGID
+macros. See
+.BR capabilities (7)
+for more information about regular expressions.
+.TP
+.B #define EXEC_PATH "<path>"
+Path of the program to execute. This option is
+.B mandatory.
+.TP
+.B #define EXEC_ARGS [arg1 [, arg2 [, ...]]]
+Arguments to pass to the program.
+.TP
+.B #define DEBUG
+Enable debugging information. By default, the wrapper silently exits with an EPERM error. With
+this macro set, the wrapper will print at which step it failed to perform a specific operation
+or check.
+
+.SH BUILD-WRAPPER VARIABLES
+These configuration variables are located in the same configuration file as wrapper macros but
+must not be interpreted by the preprocessor nor by the compiler. For this reason, they must be
+surrounded by C comments marks:
+.I "/*"
+and
+.IR "*/" .
+These variables are formatted as follows:
+.IP
+.B VARIABLE=<value>
+.P
+Valid variables are:
+.TP
+.B WRAPPER_UID=(<uid>|<user>)
+Set the file UID of the wrapper. By default, the wrapper is owner by root.
+.TP
+.B WRAPPER_GID=(<gid>|<group>)
+Set the file GID of the wrapper. By default, the wrapper has its group set to root.
+.TP
+.B WRAPPER_PATH=<path>
+Set the file location of the wrapper. The wrapper will be moved there after compilation and before
+privilege setting. By default, the wrapper is compiled at the path /var/lib/suid-wrapper/$wrapper
+.TP
+.B WRAPPER_PERMS=<perms>
+Set the file permissions of the wrapper. By default, the wrapper has permissions 4750.
+
+.SH NOTES
+As the configuration is read by the C preprocessor then the C compiler, the wrapper configuration
+file must be a valid C file. As a side effect, C language instructions are allowed in wrapper
+macros.
+.P
+The
+.B DO_*
+macros does not grant privileges but restrict it. Special privileges are granted by the setuid
+bit set on the wrapper file. If you set (or let) the setuid bit on the wrapper with a root owner,
+be sure to restrict the privileges afterwards.
+
+.SH FILES
+.TP
+.B /etc/suid-wrapper/<wrapper>.conf
+Wrapper configuration file
+.TP
+.B /var/lib/suid-wrapper/<wrapper>
+Built wrapper
+
+.SH SEE ALSO
+.BR build-wrappers (8)
+
+.SH AUTHOR
+This manage was written by Emmanuel Thierry <emmanuel.thierry@sekil.fr>, who is the original author of suid-wrapper.
